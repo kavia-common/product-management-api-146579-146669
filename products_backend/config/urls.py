@@ -28,9 +28,11 @@ urlpatterns = [
 
 schema_view = get_schema_view(
    openapi.Info(
-      title="My API",
+      title="Products API",
       default_version='v1',
-      description="Test description",
+      description="CRUD API for managing products (Ocean Professional theme).",
+      contact=openapi.Contact(name="API Support"),
+      license=openapi.License(name="MIT"),
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
