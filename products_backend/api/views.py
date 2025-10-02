@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework import generics, permissions
 from rest_framework.renderers import JSONRenderer, BrowsableAPIRenderer
 from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from django.db.models import F, Sum, DecimalField, ExpressionWrapper
 
 from .models import Product
 from .serializers import ProductSerializer
@@ -142,3 +144,48 @@ class ProductRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     )
     def delete(self, request, *args, **kwargs):
         return super().delete(request, *args, **kwargs)
+
+
+# PUBLIC_INTERFACE
+@swagger_auto_schema(
+    method='get',
+    operation_id="getTotalStockBalance",
+    operation_summary="Total stock balance",
+    operation_description="Return the total inventory value as the sum over all products of price * quantity.",
+    responses={
+        200: openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "total_balance": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format="decimal",
+                    description="Total inventory value (sum of price * quantity).",
+                )
+            },
+            required=["total_balance"],
+        )
+    },
+    tags=["Products"],
+)
+@api_view(["GET"])
+def total_stock_balance(request):
+    """
+    Calculate and return the total inventory value.
+
+    Computes the sum of (price * quantity) for all Product records.
+
+    Returns:
+        200 OK with JSON body:
+            {
+              "total_balance": "<decimal string>"
+            }
+    """
+    # Use ExpressionWrapper to ensure precise Decimal math in DB
+    value_expr = ExpressionWrapper(
+        F("price") * F("quantity"),
+        output_field=DecimalField(max_digits=20, decimal_places=2),
+    )
+    agg = Product.objects.aggregate(total=Sum(value_expr))
+    total = agg["total"] or 0
+    # Ensure consistent string representation for decimals
+    return Response({"total_balance": str(total)})
